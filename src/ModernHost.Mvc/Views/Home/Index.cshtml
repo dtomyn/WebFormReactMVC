@@ -11,12 +11,12 @@
 <section class="hero" aria-label="Host overview">
     <p class="hero__eyebrow">Phase 2</p>
     <p class="hero__summary">
-        This page hosts the same shared React people directory bundle used by LegacyHost.WebForms and passes the configured Modern API base URL through the same mount attributes.
+        This MVC page hosts the shared React people directory bundle and passes the configured Modern API base URL through its mount attributes.
     </p>
 </section>
 
 <section aria-label="Shared people application">
-    <div data-people-app="true" data-api-base-url="@Model.PeopleApiBaseUrl">
+    <div data-people-app="true" data-api-base-url="@Model.PeopleApiBaseUrl" data-host-display-name="ModernHost.Mvc">
         <p class="hero__summary" role="status" aria-live="polite">Loading people directory...</p>
     </div>
 </section>

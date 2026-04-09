@@ -6,7 +6,9 @@ const expectedPeopleEndpoint = `${
 }/api/people`
 
 test.describe('LegacyHost.WebForms Default.aspx', () => {
-  test('renders the React people directory inside the Web Forms page', async ({ page }) => {
+  test('renders the React people directory inside the Web Forms page with the legacy host label', async ({
+    page,
+  }) => {
     await page.goto('/Default.aspx')
 
     await expect(page).toHaveTitle(/Legacy Host - LegacyHost\.WebForms/)
@@ -17,6 +19,9 @@ test.describe('LegacyHost.WebForms Default.aspx', () => {
     ).toBeVisible()
     await expect(page.getByRole('heading', { name: 'People directory' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Who is editing right now' })).toBeVisible()
+    await expect(page.locator('.people-hero__summary')).toContainText(
+      'This instance is currently hosted by LegacyHost.WebForms.',
+    )
     await expect(page.getByRole('region', { name: 'Directory results' })).toContainText(
       expectedPeopleEndpoint,
     )

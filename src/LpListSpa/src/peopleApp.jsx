@@ -7,7 +7,7 @@ import './index.css'
 /**
  * Mounts the shared people app into a specific DOM element.
  * @param {Element} container
- * @param {{ apiBaseUrl?: string }} [options]
+ * @param {{ apiBaseUrl?: string, hostDisplayName?: string }} [options]
  * @returns {void}
  */
 export function mountPeopleApp(container, options = {}) {
@@ -18,6 +18,11 @@ export function mountPeopleApp(container, options = {}) {
       <App
         apiBaseUrl={
           options.apiBaseUrl ?? container.getAttribute('data-api-base-url') ?? ''
+        }
+        hostDisplayName={
+          options.hostDisplayName ??
+          container.getAttribute('data-host-display-name') ??
+          ''
         }
       />
     </StrictMode>,

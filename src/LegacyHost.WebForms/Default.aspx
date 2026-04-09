@@ -18,6 +18,6 @@
         <h2>Legacy host with injected React people component</h2>
         <p>The component below is rendered by the shared React app and populated from ModernApi.</p>
     </section>
-    <div data-people-app="true" data-api-base-url="<%= PeopleApiBaseUrl %>"></div>
+    <div data-people-app="true" data-api-base-url="<%= PeopleApiBaseUrl %>" data-host-display-name="LegacyHost.WebForms"></div>
     <script type="module" src="/ClientApp/people-app.js"></script>
 </asp:Content>

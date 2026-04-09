@@ -12,12 +12,19 @@ const applicationHostPath =
   process.env.PLAYWRIGHT_APPLICATIONHOST_PATH ??
   path.resolve(repositoryRoot, '.vs', 'CIBC.slnx', 'config', 'applicationhost.config')
 const legacyHostBaseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:63755'
+const modernHostBaseUrl = process.env.PLAYWRIGHT_MVC_BASE_URL ?? 'https://localhost:7184'
 const modernApiBaseUrl = process.env.PLAYWRIGHT_API_URL ?? 'https://localhost:7114'
 const modernApiReadyUrl =
   process.env.PLAYWRIGHT_API_READY_URL ?? 'https://localhost:7114/api/people'
 const legacyHostCommand =
   process.env.PLAYWRIGHT_LEGACY_HOST_COMMAND ??
   `"${iisExpressPath}" /site:LegacyHost.WebForms /config:"${applicationHostPath}"`
+const modernHostCommand = `dotnet run --project "${path.resolve(
+  repositoryRoot,
+  'src',
+  'ModernHost.Mvc',
+  'ModernHost.Mvc.csproj',
+)}" --launch-profile https`
 const modernApiCommand =
   process.env.PLAYWRIGHT_API_COMMAND ??
   `dotnet run --project "${path.resolve(repositoryRoot, 'src', 'ModernApi', 'ModernApi.csproj')}" --launch-profile https`
@@ -50,6 +57,14 @@ export default defineConfig({
       command: legacyHostCommand,
       url: `${legacyHostBaseUrl}/Default.aspx`,
       name: 'LegacyHost.WebForms',
+      timeout: 120_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: modernHostCommand,
+      url: modernHostBaseUrl,
+      ignoreHTTPSErrors: true,
+      name: 'ModernHost.Mvc',
       timeout: 120_000,
       reuseExistingServer: !process.env.CI,
     },

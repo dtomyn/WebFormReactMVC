@@ -435,10 +435,10 @@ function EditingToast({ toast, onDismiss }) {
 
 /**
  * Renders the shared people app backed by ModernApi.
- * @param {{ apiBaseUrl?: string }} props
+ * @param {{ apiBaseUrl?: string, hostDisplayName?: string }} props
  * @returns {JSX.Element}
  */
-function App({ apiBaseUrl = '' }) {
+function App({ apiBaseUrl = '', hostDisplayName = '' }) {
   const [people, setPeople] = useState([])
   const [requestState, setRequestState] = useState('loading')
   const [errorMessage, setErrorMessage] = useState('')
@@ -464,6 +464,7 @@ function App({ apiBaseUrl = '' }) {
   const currentEditorName = editorName.trim() || 'Anonymous user'
   const endpoint = buildApiEndpoint(apiBaseUrl, peopleEndpointPath)
   const activeEdits = Object.values(editingPresenceByPersonId)
+  const resolvedHostDisplayName = hostDisplayName.trim() || 'the current host'
   const otherEditorsForActivePerson = editingPerson
     ? editingPresenceByPersonId[editingPerson.id]?.editors?.filter(
         (editor) => editor !== currentEditorName,
@@ -797,11 +798,12 @@ function App({ apiBaseUrl = '' }) {
       <EditingToast onDismiss={dismissEditingToast} toast={editingToast} />
 
       <header className="people-hero">
-        <p className="people-hero__eyebrow">ModernApi + React + Web Forms</p>
+        <p className="people-hero__eyebrow">ModernApi + React + Shared UI</p>
         <h1>People directory</h1>
         <p className="people-hero__summary">
           The list below is loaded from ModernApi and rendered by the same React
-          component in the standalone app and inside LegacyHost.WebForms.
+          component in the standalone app and in multiple hosts. This instance is
+          currently hosted by <strong>{resolvedHostDisplayName}</strong>.
         </p>
       </header>
 
