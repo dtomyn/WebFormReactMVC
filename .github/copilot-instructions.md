@@ -2,7 +2,7 @@
 
 ## Repository Overview
 
-This is a **legacy modernization showcase**: a .NET Framework 4.8 Web Forms app (`LegacyHost.WebForms`) that embeds a React SPA (`LpListSpa`) which in turn consumes a .NET 10 Web API (`ModernApi`). The three projects are orchestrated by `CIBC.slnx`.
+This is a **legacy modernization showcase**: a .NET Framework 4.8 Web Forms app (`LegacyHost.WebForms`) that embeds a React SPA (`LpListSpa`) which in turn consumes a .NET 10 Web API (`ModernApi`). The three projects are orchestrated by `WebFormReactMVC.slnx`.
 
 ```
 LegacyHost.WebForms (.NET 4.8)
@@ -18,7 +18,7 @@ The React bundle is **generated at build time** by MSBuild targets in `LpListSpa
 
 ```powershell
 # Full solution (builds API, bundles React, copies to Web Forms)
-dotnet build CIBC.slnx
+dotnet build WebFormReactMVC.slnx
 
 # React bundle only
 dotnet build src/LpListSpa/LpListSpa.csproj

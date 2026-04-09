@@ -18,7 +18,7 @@ The React bundle is generated at build time by MSBuild targets in `LpListSpa.csp
 
 ```bash
 # Full solution (builds API, bundles React, copies to Web Forms)
-dotnet build CIBC.slnx
+dotnet build WebFormReactMVC.slnx
 
 # React bundle only
 dotnet build src/LpListSpa/LpListSpa.csproj

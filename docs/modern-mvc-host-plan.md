@@ -58,7 +58,7 @@ src/
     ModernHost.Mvc.csproj
 ```
 
-Add the new project to `CIBC.slnx`.
+Add the new project to `WebFormReactMVC.slnx`.
 
 ## Architecture Decisions
 
@@ -229,7 +229,7 @@ The first implementation pass should produce:
 
 - a new `src/ModernHost.Mvc` project
 - MVC page hosting the shared React bundle
-- `CIBC.slnx` updated to include the new host
+- `WebFormReactMVC.slnx` updated to include the new host
 - shared build pipeline copying bundle assets into both hosts
 - Playwright coverage for the MVC host path
 - run instructions updated in `README.md`

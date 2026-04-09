@@ -1,9 +1,9 @@
 {
-  "name": "cibc-playwright-tests",
+  "name": "webformreactmvc-playwright-tests",
   "private": true,
   "type": "module",
   "scripts": {
-    "build:app": "dotnet build ..\\CIBC.slnx",
+    "build:app": "dotnet build ..\\WebFormReactMVC.slnx",
     "install:browsers": "playwright install chromium",
     "test": "npm run build:app && playwright test",
     "test:api": "playwright test --project modern-api",
