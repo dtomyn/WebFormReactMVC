@@ -5,7 +5,9 @@
     <EnableDefaultItems>false</EnableDefaultItems>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <Nullable>enable</Nullable>
+    <SpaDistDir>$(MSBuildProjectDirectory)\dist</SpaDistDir>
     <LegacyHostClientAppDir>$(MSBuildProjectDirectory)\..\LegacyHost.WebForms\ClientApp</LegacyHostClientAppDir>
+    <ModernHostPeopleAppDir>$(MSBuildProjectDirectory)\..\ModernHost.Mvc\wwwroot\people-app</ModernHostPeopleAppDir>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="SolutionMarker.cs" />
@@ -25,16 +27,20 @@
   <Target Name="BuildSpa" BeforeTargets="Build">
     <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
-  <Target Name="SyncSpaToLegacyHost" AfterTargets="Build" Condition="Exists('$(MSBuildProjectDirectory)\dist')">
+  <Target Name="SyncSpaToHosts" AfterTargets="Build" Condition="Exists('$(SpaDistDir)')">
     <ItemGroup>
-      <BuiltSpaAssets Include="$(MSBuildProjectDirectory)\dist\**\*" />
+      <BuiltSpaAssets Include="$(SpaDistDir)\**\*" />
     </ItemGroup>
     <RemoveDir Directories="$(LegacyHostClientAppDir)" Condition="Exists('$(LegacyHostClientAppDir)')" />
+    <RemoveDir Directories="$(ModernHostPeopleAppDir)" Condition="Exists('$(ModernHostPeopleAppDir)')" />
     <MakeDir Directories="$(LegacyHostClientAppDir)" />
+    <MakeDir Directories="$(ModernHostPeopleAppDir)" />
     <Copy SourceFiles="@(BuiltSpaAssets)" DestinationFiles="@(BuiltSpaAssets->'$(LegacyHostClientAppDir)\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(BuiltSpaAssets)" DestinationFiles="@(BuiltSpaAssets->'$(ModernHostPeopleAppDir)\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
   <Target Name="CleanSpa" AfterTargets="Clean">
-    <RemoveDir Directories="$(MSBuildProjectDirectory)\dist" Condition="Exists('$(MSBuildProjectDirectory)\dist')" />
+    <RemoveDir Directories="$(SpaDistDir)" Condition="Exists('$(SpaDistDir)')" />
     <RemoveDir Directories="$(LegacyHostClientAppDir)" Condition="Exists('$(LegacyHostClientAppDir)')" />
+    <RemoveDir Directories="$(ModernHostPeopleAppDir)" Condition="Exists('$(ModernHostPeopleAppDir)')" />
   </Target>
 </Project>
