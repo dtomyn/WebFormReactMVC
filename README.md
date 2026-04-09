@@ -19,6 +19,13 @@ Instead, the flow is:
 5. The API returns the in-memory people list.
 6. The React component renders that list inside the Web Forms page.
 
+SignalR is also used for live editing presence:
+
+1. Each browser tab connects to `ModernApi` over SignalR.
+2. When a user opens an edit dialog, that tab announces which person is being edited.
+3. Other open pages immediately see who is currently editing which person.
+4. When the dialog is closed or saved, the editing presence is cleared.
+
 ## Prerequisites
 
 Install all of the following before trying to run the full end-to-end flow:
@@ -155,6 +162,24 @@ Then open the Vite URL shown in the terminal, usually:
 In this mode, Vite proxies `/api` requests to `https://localhost:7114`, so `ModernApi` must still be running.
 
 This is useful for frontend iteration, but it is not the legacy-hosted scenario.
+
+## Test Live Editing Presence
+
+To verify that other users can see who is editing which person:
+
+1. Start `ModernApi`
+2. Start `LegacyHost.WebForms`
+3. Open `http://localhost:63755/Default.aspx` in two browser windows or tabs
+4. In one page, click `Edit` on a person
+5. In the other page, look at the `Who is editing right now` section and the person card badge
+
+Expected behavior:
+
+- each page gets its own default display name
+- opening the dialog shows that user as currently editing the selected person
+- closing or saving the dialog removes that presence from the other page
+
+The display name is stored per browser tab session, so two tabs can appear as different users during local testing.
 
 ## Config That Controls The Legacy-to-API Connection
 

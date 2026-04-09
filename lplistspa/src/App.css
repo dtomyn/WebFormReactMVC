@@ -46,6 +46,82 @@
   box-shadow: var(--shadow);
 }
 
+.presence-panel {
+  padding: 24px 28px;
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: var(--shadow);
+}
+
+.presence-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.presence-panel__eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.presence-panel__header h2 {
+  margin: 0;
+}
+
+.presence-panel__status {
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.presence-panel__status--connected {
+  background: rgba(11, 110, 79, 0.12);
+  color: var(--accent);
+}
+
+.presence-panel__status--connecting,
+.presence-panel__status--reconnecting {
+  background: rgba(255, 183, 3, 0.18);
+  color: #7a5600;
+}
+
+.presence-panel__status--disconnected {
+  background: rgba(183, 28, 28, 0.1);
+  color: #8f1212;
+}
+
+.people-field--presence {
+  max-width: 320px;
+}
+
+.presence-list {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.presence-list__item {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(11, 110, 79, 0.08);
+  color: var(--ink);
+}
+
+.presence-panel__empty {
+  margin-top: 18px;
+  color: var(--muted);
+}
+
 .people-surface__header {
   display: flex;
   justify-content: space-between;
@@ -112,6 +188,16 @@
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 244, 237, 0.92));
   min-height: 180px;
+}
+
+.person-card__presence {
+  margin: 0 0 14px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: rgba(11, 110, 79, 0.08);
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .person-card__header {
@@ -268,12 +354,14 @@
 
 @media (max-width: 720px) {
   .people-hero,
-  .people-surface {
+  .people-surface,
+  .presence-panel {
     padding: 22px;
     border-radius: 22px;
   }
 
-  .people-surface__header {
+  .people-surface__header,
+  .presence-panel__header {
     flex-direction: column;
   }
 
