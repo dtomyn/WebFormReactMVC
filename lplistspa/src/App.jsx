@@ -162,6 +162,28 @@ function formatEditorNames(editorNames, currentEditorName) {
 }
 
 /**
+ * Formats editor names for singular or plural toast copy.
+ * @param {string[]} editorNames
+ * @param {string} currentEditorName
+ * @returns {string}
+ */
+function formatToastEditorNames(editorNames, currentEditorName) {
+  const formattedNames = editorNames.map((editorName) =>
+    editorName === currentEditorName ? 'you' : editorName,
+  )
+
+  if (formattedNames.length <= 1) {
+    return formattedNames[0] ?? ''
+  }
+
+  if (formattedNames.length === 2) {
+    return `${formattedNames[0]} and ${formattedNames[1]}`
+  }
+
+  return `${formattedNames.slice(0, -1).join(', ')}, and ${formattedNames.at(-1)}`
+}
+
+/**
  * Announces the current edit state to the SignalR hub.
  * @param {import('@microsoft/signalr').HubConnection} connection
  * @param {{ id: number, name: string } | null} person
@@ -379,6 +401,39 @@ function EditPersonDialog({
 }
 
 /**
+ * Renders a dismissible toast banner for editing conflicts.
+ * @param {{ toast: { id: number, message: string } | null, onDismiss: () => void }} props
+ * @returns {JSX.Element | null}
+ */
+function EditingToast({ toast, onDismiss }) {
+  if (!toast) {
+    return null
+  }
+
+  return (
+    <section
+      aria-atomic="true"
+      aria-live="assertive"
+      className="editing-toast"
+      role="status"
+    >
+      <div>
+        <p className="editing-toast__eyebrow">Editing alert</p>
+        <p className="editing-toast__message">{toast.message}</p>
+      </div>
+      <button
+        aria-label="Dismiss editing alert"
+        className="editing-toast__dismiss"
+        onClick={onDismiss}
+        type="button"
+      >
+        Dismiss
+      </button>
+    </section>
+  )
+}
+
+/**
  * Renders the shared people app backed by ModernApi.
  * @param {{ apiBaseUrl?: string }} props
  * @returns {JSX.Element}
@@ -399,13 +454,21 @@ function App({ apiBaseUrl = '' }) {
   const [editorName, setEditorName] = useState(() => getInitialEditorName())
   const [presenceState, setPresenceState] = useState('connecting')
   const [editingPresenceByPersonId, setEditingPresenceByPersonId] = useState({})
+  const [editingToast, setEditingToast] = useState(null)
   const nameInputRef = useRef(null)
   const connectionRef = useRef(null)
   const editingPersonRef = useRef(null)
   const editorNameRef = useRef('Anonymous user')
+  const previousOtherEditorsRef = useRef([])
+  const toastTimerRef = useRef(null)
   const currentEditorName = editorName.trim() || 'Anonymous user'
   const endpoint = buildApiEndpoint(apiBaseUrl, peopleEndpointPath)
   const activeEdits = Object.values(editingPresenceByPersonId)
+  const otherEditorsForActivePerson = editingPerson
+    ? editingPresenceByPersonId[editingPerson.id]?.editors?.filter(
+        (editor) => editor !== currentEditorName,
+      ) ?? []
+    : []
 
   useEffect(() => {
     editingPersonRef.current = editingPerson
@@ -418,6 +481,14 @@ function App({ apiBaseUrl = '' }) {
   useEffect(() => {
     persistEditorName(currentEditorName)
   }, [currentEditorName])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -541,6 +612,7 @@ function App({ apiBaseUrl = '' }) {
 
   useEffect(() => {
     if (!editingPerson) {
+      previousOtherEditorsRef.current = []
       return undefined
     }
 
@@ -559,6 +631,46 @@ function App({ apiBaseUrl = '' }) {
       document.removeEventListener('keydown', handleEscape)
     }
   }, [editingPerson, saveState])
+
+  useEffect(() => {
+    if (!editingPerson) {
+      previousOtherEditorsRef.current = []
+      return
+    }
+
+    const previousEditors = new Set(previousOtherEditorsRef.current)
+    const addedEditors = otherEditorsForActivePerson.filter(
+      (editor) => !previousEditors.has(editor),
+    )
+
+    previousOtherEditorsRef.current = otherEditorsForActivePerson
+
+    if (addedEditors.length === 0) {
+      return
+    }
+
+    const message =
+      addedEditors.length === 1
+        ? `${formatToastEditorNames(addedEditors, currentEditorName)} also started editing ${editingPerson.name}.`
+        : `${formatToastEditorNames(addedEditors, currentEditorName)} also started editing ${editingPerson.name}.`
+
+    const nextToast = {
+      id: Date.now(),
+      message,
+    }
+
+    setEditingToast(nextToast)
+
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+
+    toastTimerRef.current = window.setTimeout(() => {
+      setEditingToast((currentToast) =>
+        currentToast?.id === nextToast.id ? null : currentToast,
+      )
+    }, 5000)
+  }, [currentEditorName, editingPerson, otherEditorsForActivePerson])
 
   /**
    * Opens the edit dialog for a selected person.
@@ -583,6 +695,19 @@ function App({ apiBaseUrl = '' }) {
 
     setEditingPerson(null)
     setSaveErrorMessage('')
+  }
+
+  /**
+   * Dismisses the active editing toast.
+   * @returns {void}
+   */
+  function dismissEditingToast() {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = null
+    }
+
+    setEditingToast(null)
   }
 
   /**
@@ -669,6 +794,8 @@ function App({ apiBaseUrl = '' }) {
 
   return (
     <section className="people-app">
+      <EditingToast onDismiss={dismissEditingToast} toast={editingToast} />
+
       <header className="people-hero">
         <p className="people-hero__eyebrow">ModernApi + React + Web Forms</p>
         <h1>People directory</h1>
@@ -753,11 +880,7 @@ function App({ apiBaseUrl = '' }) {
           formValues={formValues}
           isSaving={saveState === 'saving'}
           nameInputRef={nameInputRef}
-          otherEditors={
-            editingPresenceByPersonId[editingPerson.id]?.editors?.filter(
-              (editor) => editor !== currentEditorName,
-            ) ?? []
-          }
+          otherEditors={otherEditorsForActivePerson}
           onBackdropClick={handleBackdropClick}
           onCancel={closeEditDialog}
           onFieldChange={handleFieldChange}
