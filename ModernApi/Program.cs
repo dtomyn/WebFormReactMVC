@@ -26,7 +26,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseCors("LocalClientApps");
 
-var people = new[]
+var peopleLock = new object();
+var people = new List<Person>
 {
     new Person(1, "Mina Patel", "Product Strategy Lead", "Toronto", "mina.patel@example.com"),
     new Person(2, "Jonah Reed", "Platform Engineer", "Montreal", "jonah.reed@example.com"),
@@ -35,9 +36,59 @@ var people = new[]
     new Person(5, "Sofia Nguyen", "UX Researcher", "Ottawa", "sofia.nguyen@example.com")
 };
 
-app.MapGet("/api/people", () => TypedResults.Ok(people))
+app.MapGet("/api/people", () =>
+{
+    lock (peopleLock)
+    {
+        return TypedResults.Ok(people.ToArray());
+    }
+})
     .WithName("GetPeople");
+
+app.MapPut("/api/people/{id:int}", (int id, UpdatePersonRequest request) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Name)
+        || string.IsNullOrWhiteSpace(request.Role)
+        || string.IsNullOrWhiteSpace(request.Location)
+        || string.IsNullOrWhiteSpace(request.Email))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["person"] = ["Name, role, location, and email are required."]
+        });
+    }
+
+    if (!request.Email.Contains('@'))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["email"] = ["Email must contain '@'."]
+        });
+    }
+
+    lock (peopleLock)
+    {
+        var currentIndex = people.FindIndex(person => person.Id == id);
+
+        if (currentIndex < 0)
+        {
+            return Results.NotFound();
+        }
+
+        var updatedPerson = new Person(
+            id,
+            request.Name.Trim(),
+            request.Role.Trim(),
+            request.Location.Trim(),
+            request.Email.Trim());
+
+        people[currentIndex] = updatedPerson;
+        return Results.Ok(updatedPerson);
+    }
+})
+    .WithName("UpdatePerson");
 
 app.Run();
 
 internal sealed record Person(int Id, string Name, string Role, string Location, string Email);
+internal sealed record UpdatePersonRequest(string Name, string Role, string Location, string Email);
