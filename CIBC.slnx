@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="LegacyHost.WebForms/LegacyHost.WebForms.csproj" Id="fdf5cf4a-a789-4bdd-8319-f9a3958b6412" />
-  <Project Path="LpListSpa/LpListSpa.csproj" />
-  <Project Path="ModernApi/ModernApi.csproj" />
+  <Project Path="src/LegacyHost.WebForms/LegacyHost.WebForms.csproj" Id="fdf5cf4a-a789-4bdd-8319-f9a3958b6412" />
+  <Project Path="src/LpListSpa/LpListSpa.csproj" />
+  <Project Path="src/ModernApi/ModernApi.csproj" />
 </Solution>

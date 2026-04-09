@@ -1,0 +1,21 @@
+{
+  "name": "cibc-playwright-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:app": "dotnet build ..\\CIBC.slnx",
+    "install:browsers": "playwright install chromium",
+    "test": "npm run build:app && playwright test",
+    "test:api": "playwright test --project modern-api",
+    "test:headed": "playwright test --project legacy-host-chromium --headed",
+    "test:page": "playwright test --project legacy-host-chromium",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^24.6.0",
+    "typescript": "^5.9.3"
+  }
+}

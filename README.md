@@ -2,9 +2,9 @@
 
 This solution contains three projects that work together:
 
-- `ModernApi`: a .NET 10 Web API that returns an in-memory list of people.
-- `LpListSpa`: a React app that renders the people list.
-- `LegacyHost.WebForms`: a .NET Framework Web Forms app that loads the built React bundle and shows the API data inside the legacy page.
+- `src/ModernApi`: a .NET 10 Web API that returns an in-memory list of people.
+- `src/LpListSpa`: a React app that renders the people list.
+- `src/LegacyHost.WebForms`: a .NET Framework Web Forms app that loads the built React bundle and shows the API data inside the legacy page.
 
 ## How The Integration Works
 
@@ -13,8 +13,8 @@ The React component is not hard-coded into the Web Forms project.
 Instead, the flow is:
 
 1. `LpListSpa` builds a React bundle.
-2. That bundle is copied into `LegacyHost.WebForms/ClientApp`.
-3. `LegacyHost.WebForms/Default.aspx` loads that bundle.
+2. That bundle is copied into `src/LegacyHost.WebForms/ClientApp`.
+3. `src/LegacyHost.WebForms/Default.aspx` loads that bundle.
 4. The bundle calls `ModernApi` at `https://localhost:7114/api/people`.
 5. The API returns the in-memory people list.
 6. The React component renders that list inside the Web Forms page.
@@ -53,13 +53,13 @@ What this does:
 
 - builds `ModernApi`
 - builds `LpListSpa`
-- creates the React bundle in `LpListSpa/dist`
-- copies the built files into `LegacyHost.WebForms/ClientApp`
+- creates the React bundle in `src/LpListSpa/dist`
+- copies the built files into `src/LegacyHost.WebForms/ClientApp`
 
 After a successful build, these files should exist:
 
-- `LegacyHost.WebForms/ClientApp/people-app.js`
-- `LegacyHost.WebForms/ClientApp/people-app.css`
+- `src/LegacyHost.WebForms/ClientApp/people-app.js`
+- `src/LegacyHost.WebForms/ClientApp/people-app.css`
 
 If those files do not exist, the React component cannot appear inside the Web Forms page.
 
@@ -72,7 +72,7 @@ To see the React component inside the legacy Web Forms page with live API data, 
 From the solution root:
 
 ```powershell
-dotnet run --project ModernApi --launch-profile https
+dotnet run --project src/ModernApi --launch-profile https
 ```
 
 Wait until you see:
@@ -118,7 +118,7 @@ If you want the shortest dependable path, use exactly this:
 
 ```powershell
 dotnet build CIBC.slnx
-dotnet run --project ModernApi --launch-profile https
+dotnet run --project src/ModernApi --launch-profile https
 ```
 
 Then, in Visual Studio:
@@ -128,21 +128,21 @@ Then, in Visual Studio:
 
 ## When You Change The React App
 
-If you edit files under `LpListSpa/src`, you must rebuild so the updated bundle is copied into the Web Forms project.
+If you edit files under `src/LpListSpa/src`, you must rebuild so the updated bundle is copied into the Web Forms project.
 
 Use either of these:
 
 ```powershell
-dotnet build LpListSpa/LpListSpa.csproj
+dotnet build src/LpListSpa/LpListSpa.csproj
 ```
 
 or:
 
 ```powershell
-dotnet build LegacyHost.WebForms/LegacyHost.WebForms.csproj
+dotnet build src/LegacyHost.WebForms/LegacyHost.WebForms.csproj
 ```
 
-Either option rebuilds the SPA bundle and refreshes `LegacyHost.WebForms/ClientApp`.
+Either option rebuilds the SPA bundle and refreshes `src/LegacyHost.WebForms/ClientApp`.
 
 After that, refresh the browser page running the legacy app.
 
@@ -151,7 +151,7 @@ After that, refresh the browser page running the legacy app.
 If you want to work on the React UI outside the Web Forms host:
 
 ```powershell
-cd LpListSpa
+cd src/LpListSpa
 npm run dev
 ```
 
@@ -185,7 +185,7 @@ The display name is stored per browser tab session, so two tabs can appear as di
 
 The Web Forms host reads the API base URL from:
 
-- `LegacyHost.WebForms/Web.config`
+- `src/LegacyHost.WebForms/Web.config`
 
 Current setting:
 
@@ -197,7 +197,7 @@ That must match the API URL you are actually running.
 
 The API launch URL is defined in:
 
-- `ModernApi/Properties/launchSettings.json`
+- `src/ModernApi/Properties/launchSettings.json`
 
 Current HTTPS URL:
 
@@ -209,8 +209,8 @@ Current HTTPS URL:
 
 Check all of the following:
 
-1. `LegacyHost.WebForms/ClientApp/people-app.js` exists
-2. `LegacyHost.WebForms/ClientApp/people-app.css` exists
+1. `src/LegacyHost.WebForms/ClientApp/people-app.js` exists
+2. `src/LegacyHost.WebForms/ClientApp/people-app.css` exists
 3. You rebuilt after changing the React app
 4. Browser dev tools do not show a 404 for `/ClientApp/people-app.js`
 
@@ -220,7 +220,7 @@ Check all of the following:
 
 1. `ModernApi` is still running
 2. `https://localhost:7114/api/people` returns JSON
-3. `LegacyHost.WebForms/Web.config` still points to `https://localhost:7114`
+3. `src/LegacyHost.WebForms/Web.config` still points to `https://localhost:7114`
 4. The browser does not show a certificate warning or blocked HTTPS request
 
 ### The API call fails because of certificate trust
@@ -242,7 +242,7 @@ That is expected for classic Web Forms projects. Run `LegacyHost.WebForms` from 
 This repository was verified with:
 
 - `dotnet build CIBC.slnx`
-- `dotnet run --project ModernApi --launch-profile https`
+- `dotnet run --project src/ModernApi --launch-profile https`
 - `https://localhost:7114/api/people`
 
 The API returned the expected in-memory list of five people, and the build successfully produced the React assets consumed by the legacy Web Forms host.
