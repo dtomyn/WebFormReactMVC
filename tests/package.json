@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build:app": "dotnet build ..\\WebFormReactMVC.slnx",
+    "capture:side-by-side": "playwright test specs/side-by-side-presence.page.spec.ts --project legacy-host-chromium && node ./create-side-by-side-gif.mjs",
     "install:browsers": "playwright install chromium",
     "test": "npm run build:app && playwright test",
     "test:api": "playwright test --project modern-api",
@@ -16,6 +17,8 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/node": "^24.6.0",
+    "gif-encoder-2": "^1.0.5",
+    "pngjs": "^7.0.0",
     "typescript": "^5.9.3"
   }
 }

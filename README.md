@@ -7,6 +7,12 @@ This solution contains four projects that work together:
 - `src/LegacyHost.WebForms`: a .NET Framework Web Forms app that loads the built React bundle and shows the API data inside the legacy page.
 - `src/ModernHost.Mvc`: a .NET 10 ASP.NET Core MVC app that loads the same built React bundle and shows the same API data and SignalR presence in a Razor host.
 
+## Mixed-Host Demo
+
+For a generated side-by-side capture that shows both hosts editing the same person and surfacing the live SignalR presence warning, see [docs/mixed-host-side-by-side-presence.gif](docs/mixed-host-side-by-side-presence.gif).
+
+![Mixed-host live editing presence demo](docs/mixed-host-side-by-side-presence.gif)
+
 ## Quick Start
 
 From the solution root, run either of these:

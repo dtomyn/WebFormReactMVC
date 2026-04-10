@@ -34,6 +34,7 @@ npm test
 Useful targeted commands:
 
 ```powershell
+npm run capture:side-by-side
 npm run test:page
 npm run test:api
 npm run test:headed
@@ -51,6 +52,31 @@ npm run test:ui
 - `ModernApi` via `dotnet run --project src/ModernApi --launch-profile https`
 - `LegacyHost.WebForms` via IIS Express and `.vs/WebFormReactMVC.slnx/config/applicationhost.config`
 - `ModernHost.Mvc` via `dotnet run --project src/ModernHost.Mvc/ModernHost.Mvc.csproj --launch-profile https`
+
+## Side-By-Side Screenshots
+
+Run this from `tests` when you want a single browser page that shows both hosts side by side and captures the live editing presence state:
+
+```powershell
+npm run capture:side-by-side
+```
+
+The screenshot flow:
+
+- starts `ModernApi`, `LegacyHost.WebForms`, and `ModernHost.Mvc`
+- loads both hosts into side-by-side iframes on a single Playwright page
+- opens the edit dialog in the legacy host
+- confirms the modern host shows the active editor presence before editing the same person
+- opens the same person in the modern host and confirms each dialog shows the other editor
+- writes PNG screenshots to `tests/test-results/captures/`
+- writes the animated GIF to `docs/mixed-host-side-by-side-presence.gif`
+
+Expected files:
+
+- `mixed-host-side-by-side-loaded.png`
+- `mixed-host-side-by-side-left-editing.png`
+- `mixed-host-side-by-side-dual-editing.png`
+- `../docs/mixed-host-side-by-side-presence.gif`
 
 If local HTTPS certificates are not trusted yet, run:
 

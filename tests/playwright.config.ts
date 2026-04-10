@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = path.resolve(currentDirectory, '..')
+const legacyProjectPath = path.resolve(repositoryRoot, 'src', 'LegacyHost.WebForms')
 const iisExpressPath =
   process.env.PLAYWRIGHT_IIS_EXPRESS_PATH ??
   'C:\\Program Files\\IIS Express\\iisexpress.exe'
@@ -35,7 +36,7 @@ function resolveApplicationHostPath() {
   const visualStudioDirectory = path.resolve(repositoryRoot, '.vs')
 
   if (!fs.existsSync(visualStudioDirectory)) {
-    return preferredPath
+    return null
   }
 
   for (const entry of fs.readdirSync(visualStudioDirectory, { withFileTypes: true })) {
@@ -50,12 +51,18 @@ function resolveApplicationHostPath() {
       'applicationhost.config',
     )
 
-    if (fs.existsSync(candidatePath)) {
+    if (!fs.existsSync(candidatePath)) {
+      continue
+    }
+
+    const applicationHostContent = fs.readFileSync(candidatePath, 'utf8')
+
+    if (applicationHostContent.includes(legacyProjectPath)) {
       return candidatePath
     }
   }
 
-  return preferredPath
+  return null
 }
 
 const applicationHostPath = resolveApplicationHostPath()
@@ -66,7 +73,9 @@ const modernApiReadyUrl =
   process.env.PLAYWRIGHT_API_READY_URL ?? 'https://localhost:7114/api/people'
 const legacyHostCommand =
   process.env.PLAYWRIGHT_LEGACY_HOST_COMMAND ??
-  `"${iisExpressPath}" /site:LegacyHost.WebForms /config:"${applicationHostPath}"`
+  (applicationHostPath
+    ? `"${iisExpressPath}" /site:LegacyHost.WebForms /config:"${applicationHostPath}"`
+    : `"${iisExpressPath}" /path:"${legacyProjectPath}" /port:63755`)
 const modernHostCommand = `dotnet run --project "${path.resolve(
   repositoryRoot,
   'src',

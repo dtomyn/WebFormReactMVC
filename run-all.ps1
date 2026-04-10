@@ -31,13 +31,15 @@ function Resolve-ApplicationHostPath {
         [string]$RepositoryRoot
     )
 
+    $legacyProjectPath = Join-Path $RepositoryRoot 'src\LegacyHost.WebForms'
+
     if (-not [string]::IsNullOrWhiteSpace($env:PLAYWRIGHT_APPLICATIONHOST_PATH) -and (Test-Path $env:PLAYWRIGHT_APPLICATIONHOST_PATH)) {
         return $env:PLAYWRIGHT_APPLICATIONHOST_PATH
     }
 
     $preferredPath = Join-Path $RepositoryRoot '.vs\WebFormReactMVC.slnx\config\applicationhost.config'
 
-    if (Test-Path $preferredPath) {
+    if ((Test-Path $preferredPath) -and ((Get-Content -Path $preferredPath -Raw) -like "*$legacyProjectPath*")) {
         return $preferredPath
     }
 
@@ -52,7 +54,7 @@ function Resolve-ApplicationHostPath {
             Join-Path $_.FullName 'config\applicationhost.config'
         } |
         Where-Object {
-            Test-Path $_
+            (Test-Path $_) -and ((Get-Content -Path $_ -Raw) -like "*$legacyProjectPath*")
         } |
         Select-Object -First 1
 
