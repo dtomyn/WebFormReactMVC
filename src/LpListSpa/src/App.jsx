@@ -5,6 +5,30 @@ import { buildApiEndpoint, createPeoplePresenceConnection } from './peoplePresen
 
 const peopleEndpointPath = '/api/people'
 const editorNameStorageKey = 'people-editor-name'
+const defaultQueryState = Object.freeze({
+  page: 1,
+  pageSize: 25,
+  search: '',
+  location: '',
+  role: '',
+  sortBy: 'name',
+  sortDirection: 'asc',
+})
+const pageSizeOptions = Object.freeze([10, 25, 50, 100])
+const sortFieldOptions = Object.freeze([
+  { value: 'name', label: 'Name' },
+  { value: 'id', label: 'ID' },
+  { value: 'location', label: 'Location' },
+  { value: 'role', label: 'Role' },
+  { value: 'email', label: 'Email' },
+])
+const sortDirectionOptions = Object.freeze([
+  { value: 'asc', label: 'Ascending' },
+  { value: 'desc', label: 'Descending' },
+])
+const supportedSortFields = new Set(
+  sortFieldOptions.map((option) => option.value),
+)
 
 /**
  * @typedef {Object} Person
@@ -16,13 +40,36 @@ const editorNameStorageKey = 'people-editor-name'
  */
 
 /**
- * Fetches people from the ModernApi service.
- * @param {string} endpoint
- * @param {AbortSignal} signal
- * @returns {Promise<Person[]>}
+ * @typedef {Object} DirectoryQuery
+ * @property {number} page
+ * @property {number} pageSize
+ * @property {string} search
+ * @property {string} location
+ * @property {string} role
+ * @property {string} sortBy
+ * @property {string} sortDirection
  */
-async function fetchPeople(endpoint, signal) {
-  const response = await fetch(endpoint, {
+
+/**
+ * @typedef {Object} PeoplePage
+ * @property {Person[]} items
+ * @property {number} page
+ * @property {number} pageSize
+ * @property {number} totalCount
+ * @property {number} totalPages
+ * @property {boolean} hasPreviousPage
+ * @property {boolean} hasNextPage
+ * @property {{ search: string | null, location: string | null, role: string | null, sortBy: string, sortDirection: string }} appliedFilters
+ */
+
+/**
+ * Fetches a single paged directory envelope from the ModernApi service.
+ * @param {string} requestUrl
+ * @param {AbortSignal} signal
+ * @returns {Promise<PeoplePage>}
+ */
+async function fetchPeoplePage(requestUrl, signal) {
+  const response = await fetch(requestUrl, {
     headers: {
       Accept: 'application/json',
     },
@@ -34,6 +81,283 @@ async function fetchPeople(endpoint, signal) {
   }
 
   return response.json()
+}
+
+/**
+ * Trims a query-string filter value and converts blank values into an empty string.
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
+function normalizeFilterValue(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+/**
+ * Normalizes a 1-based page number to a valid positive integer.
+ * @param {number | string | null | undefined} value
+ * @returns {number}
+ */
+function normalizePageValue(value) {
+  const parsedValue = Number.parseInt(String(value ?? ''), 10)
+
+  return Number.isFinite(parsedValue) && parsedValue > 0
+    ? parsedValue
+    : defaultQueryState.page
+}
+
+/**
+ * Normalizes page size values to the supported API range.
+ * @param {number | string | null | undefined} value
+ * @returns {number}
+ */
+function normalizePageSizeValue(value) {
+  const parsedValue = Number.parseInt(String(value ?? ''), 10)
+
+  if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+    return defaultQueryState.pageSize
+  }
+
+  return Math.min(parsedValue, 100)
+}
+
+/**
+ * Normalizes the requested sort field to the server contract.
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
+function normalizeSortBy(value) {
+  const normalizedValue = normalizeFilterValue(value).toLowerCase()
+
+  return supportedSortFields.has(normalizedValue)
+    ? normalizedValue
+    : defaultQueryState.sortBy
+}
+
+/**
+ * Normalizes the requested sort direction to ascending or descending.
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
+function normalizeSortDirection(value) {
+  return normalizeFilterValue(value).toLowerCase() === 'desc'
+    ? 'desc'
+    : defaultQueryState.sortDirection
+}
+
+/**
+ * Produces a fully normalized directory query state object.
+ * @param {Partial<DirectoryQuery>} [queryState]
+ * @returns {DirectoryQuery}
+ */
+function normalizeQueryState(queryState = defaultQueryState) {
+  return {
+    page: normalizePageValue(queryState.page),
+    pageSize: normalizePageSizeValue(queryState.pageSize),
+    search: normalizeFilterValue(queryState.search),
+    location: normalizeFilterValue(queryState.location),
+    role: normalizeFilterValue(queryState.role),
+    sortBy: normalizeSortBy(queryState.sortBy),
+    sortDirection: normalizeSortDirection(queryState.sortDirection),
+  }
+}
+
+/**
+ * Reads the browser URL query string into normalized directory state.
+ * @returns {DirectoryQuery}
+ */
+function readQueryFromUrl() {
+  if (typeof window === 'undefined') {
+    return { ...defaultQueryState }
+  }
+
+  const searchParams = new URLSearchParams(window.location.search)
+
+  return normalizeQueryState({
+    page: searchParams.get('page'),
+    pageSize: searchParams.get('pageSize'),
+    search: searchParams.get('search'),
+    location: searchParams.get('location'),
+    role: searchParams.get('role'),
+    sortBy: searchParams.get('sortBy'),
+    sortDirection: searchParams.get('sortDirection'),
+  })
+}
+
+/**
+ * Converts the current query state into a stable browser query string.
+ * @param {DirectoryQuery} queryState
+ * @returns {string}
+ */
+function buildQueryString(queryState) {
+  const normalizedQueryState = normalizeQueryState(queryState)
+  const searchParams = new URLSearchParams()
+
+  if (normalizedQueryState.search) {
+    searchParams.set('search', normalizedQueryState.search)
+  }
+
+  if (normalizedQueryState.location) {
+    searchParams.set('location', normalizedQueryState.location)
+  }
+
+  if (normalizedQueryState.role) {
+    searchParams.set('role', normalizedQueryState.role)
+  }
+
+  if (normalizedQueryState.sortBy !== defaultQueryState.sortBy) {
+    searchParams.set('sortBy', normalizedQueryState.sortBy)
+  }
+
+  if (normalizedQueryState.sortDirection !== defaultQueryState.sortDirection) {
+    searchParams.set('sortDirection', normalizedQueryState.sortDirection)
+  }
+
+  if (normalizedQueryState.pageSize !== defaultQueryState.pageSize) {
+    searchParams.set('pageSize', String(normalizedQueryState.pageSize))
+  }
+
+  if (normalizedQueryState.page !== defaultQueryState.page) {
+    searchParams.set('page', String(normalizedQueryState.page))
+  }
+
+  return searchParams.toString()
+}
+
+/**
+ * Builds the GET /api/people request URL for the active query state.
+ * @param {string} endpoint
+ * @param {DirectoryQuery} queryState
+ * @returns {string}
+ */
+function buildPeopleRequestUrl(endpoint, queryState) {
+  const queryString = buildQueryString(queryState)
+  return queryString ? `${endpoint}?${queryString}` : endpoint
+}
+
+/**
+ * Compares two query-state objects after normalization.
+ * @param {DirectoryQuery} leftQueryState
+ * @param {DirectoryQuery} rightQueryState
+ * @returns {boolean}
+ */
+function sameQueryState(leftQueryState, rightQueryState) {
+  const normalizedLeftQueryState = normalizeQueryState(leftQueryState)
+  const normalizedRightQueryState = normalizeQueryState(rightQueryState)
+
+  return (
+    normalizedLeftQueryState.page === normalizedRightQueryState.page
+    && normalizedLeftQueryState.pageSize === normalizedRightQueryState.pageSize
+    && normalizedLeftQueryState.search === normalizedRightQueryState.search
+    && normalizedLeftQueryState.location === normalizedRightQueryState.location
+    && normalizedLeftQueryState.role === normalizedRightQueryState.role
+    && normalizedLeftQueryState.sortBy === normalizedRightQueryState.sortBy
+    && normalizedLeftQueryState.sortDirection
+      === normalizedRightQueryState.sortDirection
+  )
+}
+
+/**
+ * Creates an empty page envelope for loading and error states.
+ * @param {DirectoryQuery} [queryState]
+ * @returns {PeoplePage}
+ */
+function createEmptyDirectoryPage(queryState = defaultQueryState) {
+  const normalizedQueryState = normalizeQueryState(queryState)
+
+  return {
+    items: [],
+    page: normalizedQueryState.page,
+    pageSize: normalizedQueryState.pageSize,
+    totalCount: 0,
+    totalPages: 0,
+    hasPreviousPage: false,
+    hasNextPage: false,
+    appliedFilters: {
+      search: normalizedQueryState.search || null,
+      location: normalizedQueryState.location || null,
+      role: normalizedQueryState.role || null,
+      sortBy: normalizedQueryState.sortBy,
+      sortDirection: normalizedQueryState.sortDirection,
+    },
+  }
+}
+
+/**
+ * Checks whether a saved person still belongs in the currently filtered view.
+ * @param {Person} person
+ * @param {DirectoryQuery} queryState
+ * @returns {boolean}
+ */
+function matchesActiveFilters(person, queryState) {
+  const normalizedQueryState = normalizeQueryState(queryState)
+  const normalizedSearch = normalizedQueryState.search.toLowerCase()
+
+  if (normalizedSearch) {
+    const matchesSearch = [person.name, person.role, person.location, person.email]
+      .some((value) => value.toLowerCase().includes(normalizedSearch))
+
+    if (!matchesSearch) {
+      return false
+    }
+  }
+
+  if (
+    normalizedQueryState.location
+    && person.location.toLowerCase() !== normalizedQueryState.location.toLowerCase()
+  ) {
+    return false
+  }
+
+  if (
+    normalizedQueryState.role
+    && person.role.toLowerCase() !== normalizedQueryState.role.toLowerCase()
+  ) {
+    return false
+  }
+
+  return true
+}
+
+/**
+ * Calculates the current result range for the loaded page envelope.
+ * @param {PeoplePage} directoryPage
+ * @returns {{ start: number, end: number }}
+ */
+function getResultRange(directoryPage) {
+  if (directoryPage.totalCount === 0 || directoryPage.items.length === 0) {
+    return { start: 0, end: 0 }
+  }
+
+  const start = (directoryPage.page - 1) * directoryPage.pageSize + 1
+  const end = start + directoryPage.items.length - 1
+  return { start, end }
+}
+
+/**
+ * Formats a readable result summary using the current page metadata.
+ * @param {PeoplePage} directoryPage
+ * @returns {string}
+ */
+function formatDirectorySummary(directoryPage) {
+  if (directoryPage.totalCount === 0) {
+    return 'Showing 0 results'
+  }
+
+  if (directoryPage.items.length === 0) {
+    return `Showing 0 results on page ${directoryPage.page} of ${directoryPage.totalPages}`
+  }
+
+  const resultRange = getResultRange(directoryPage)
+  return `Showing ${resultRange.start}-${resultRange.end} of ${directoryPage.totalCount} people`
+}
+
+/**
+ * Determines whether the current query differs from the default directory view.
+ * @param {DirectoryQuery} queryState
+ * @returns {boolean}
+ */
+function hasCustomQueryState(queryState) {
+  return !sameQueryState(queryState, defaultQueryState)
 }
 
 /**
@@ -267,11 +591,198 @@ function EditingPresencePanel({
 }
 
 /**
+ * Renders accessible filtering, sorting, and page-size controls.
+ * @param {{
+ *   queryState: DirectoryQuery,
+ *   pageSizeChoices: number[],
+ *   isResetEnabled: boolean,
+ *   onQueryInputChange: (event: import('react').ChangeEvent<HTMLInputElement>) => void,
+ *   onSortByChange: (event: import('react').ChangeEvent<HTMLSelectElement>) => void,
+ *   onSortDirectionChange: (event: import('react').ChangeEvent<HTMLSelectElement>) => void,
+ *   onPageSizeChange: (event: import('react').ChangeEvent<HTMLSelectElement>) => void,
+ *   onReset: () => void,
+ * }} props
+ * @returns {JSX.Element}
+ */
+function FilterControls({
+  queryState,
+  pageSizeChoices,
+  isResetEnabled,
+  onQueryInputChange,
+  onSortByChange,
+  onSortDirectionChange,
+  onPageSizeChange,
+  onReset,
+}) {
+  return (
+    <section aria-labelledby="directory-controls-heading" className="directory-toolbar">
+      <div className="directory-toolbar__header">
+        <div>
+          <p className="directory-toolbar__eyebrow">Directory controls</p>
+          <h3 id="directory-controls-heading">Filter, sort, and page the directory</h3>
+          <p className="directory-toolbar__summary">
+            Search across names, roles, locations, and email, then move through
+            the server-side result pages.
+          </p>
+        </div>
+        <div className="directory-toolbar__actions">
+          <button
+            className="button button--secondary directory-toolbar__reset"
+            disabled={!isResetEnabled}
+            onClick={onReset}
+            type="button"
+          >
+            Reset view
+          </button>
+        </div>
+      </div>
+
+      <div className="directory-toolbar__grid">
+        <label className="people-field" htmlFor="directory-search">
+          <span>Search</span>
+          <input
+            id="directory-search"
+            name="search"
+            onChange={onQueryInputChange}
+            type="search"
+            value={queryState.search}
+          />
+        </label>
+
+        <label className="people-field" htmlFor="directory-location">
+          <span>Location</span>
+          <input
+            id="directory-location"
+            name="location"
+            onChange={onQueryInputChange}
+            value={queryState.location}
+          />
+        </label>
+
+        <label className="people-field" htmlFor="directory-role">
+          <span>Role</span>
+          <input
+            id="directory-role"
+            name="role"
+            onChange={onQueryInputChange}
+            value={queryState.role}
+          />
+        </label>
+
+        <label className="people-field" htmlFor="directory-sort-by">
+          <span>Sort by</span>
+          <select id="directory-sort-by" onChange={onSortByChange} value={queryState.sortBy}>
+            {sortFieldOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="people-field" htmlFor="directory-sort-direction">
+          <span>Sort direction</span>
+          <select
+            id="directory-sort-direction"
+            onChange={onSortDirectionChange}
+            value={queryState.sortDirection}
+          >
+            {sortDirectionOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="people-field" htmlFor="directory-page-size">
+          <span>Page size</span>
+          <select id="directory-page-size" onChange={onPageSizeChange} value={queryState.pageSize}>
+            {pageSizeChoices.map((pageSize) => (
+              <option key={pageSize} value={pageSize}>
+                {pageSize} per page
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Renders accessible pager controls for the active result set.
+ * @param {{
+ *   page: number,
+ *   totalPages: number,
+ *   hasPreviousPage: boolean,
+ *   hasNextPage: boolean,
+ *   onPageChange: (page: number) => void,
+ * }} props
+ * @returns {JSX.Element | null}
+ */
+function PagerControls({
+  page,
+  totalPages,
+  hasPreviousPage,
+  hasNextPage,
+  onPageChange,
+}) {
+  if (totalPages === 0) {
+    return null
+  }
+
+  return (
+    <nav aria-label="Directory pages" className="people-pager">
+      <p className="people-pager__meta" role="status" aria-live="polite">
+        Page {page} of {totalPages}
+      </p>
+
+      <div className="people-pager__buttons">
+        <button
+          className="people-pager__button"
+          disabled={!hasPreviousPage}
+          onClick={() => onPageChange(1)}
+          type="button"
+        >
+          First
+        </button>
+        <button
+          className="people-pager__button"
+          disabled={!hasPreviousPage}
+          onClick={() => onPageChange(page - 1)}
+          type="button"
+        >
+          Previous
+        </button>
+        <button
+          className="people-pager__button"
+          disabled={!hasNextPage}
+          onClick={() => onPageChange(page + 1)}
+          type="button"
+        >
+          Next
+        </button>
+        <button
+          className="people-pager__button"
+          disabled={!hasNextPage}
+          onClick={() => onPageChange(totalPages)}
+          type="button"
+        >
+          Last
+        </button>
+      </div>
+    </nav>
+  )
+}
+
+/**
  * Renders an accessible in-page editor for a selected person.
  * @param {{
  *   editingPerson: Person,
  *   formValues: { name: string, role: string, location: string, email: string },
  *   isSaving: boolean,
+ *   otherEditors: string[],
  *   saveErrorMessage: string,
  *   nameInputRef: import('react').RefObject<HTMLInputElement | null>,
  *   onBackdropClick: (event: import('react').MouseEvent<HTMLDivElement>) => void,
@@ -439,8 +950,10 @@ function EditingToast({ toast, onDismiss }) {
  * @returns {JSX.Element}
  */
 function App({ apiBaseUrl = '', hostDisplayName = '' }) {
-  const [people, setPeople] = useState([])
+  const [queryState, setQueryState] = useState(() => readQueryFromUrl())
+  const [directoryPage, setDirectoryPage] = useState(() => createEmptyDirectoryPage())
   const [requestState, setRequestState] = useState('loading')
+  const [reloadVersion, setReloadVersion] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
   const [editingPerson, setEditingPerson] = useState(null)
   const [formValues, setFormValues] = useState({
@@ -463,13 +976,23 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
   const toastTimerRef = useRef(null)
   const currentEditorName = editorName.trim() || 'Anonymous user'
   const endpoint = buildApiEndpoint(apiBaseUrl, peopleEndpointPath)
+  const peopleRequestUrl = buildPeopleRequestUrl(endpoint, queryState)
   const activeEdits = Object.values(editingPresenceByPersonId)
+  const people = directoryPage.items
   const resolvedHostDisplayName = hostDisplayName.trim() || 'the current host'
+  const pageSizeChoices = pageSizeOptions.includes(queryState.pageSize)
+    ? pageSizeOptions
+    : [...pageSizeOptions, queryState.pageSize].sort((left, right) => left - right)
   const otherEditorsForActivePerson = editingPerson
     ? editingPresenceByPersonId[editingPerson.id]?.editors?.filter(
         (editor) => editor !== currentEditorName,
       ) ?? []
     : []
+  const currentQueryString = buildQueryString(queryState)
+  const emptyStateMessage =
+    directoryPage.totalCount === 0
+      ? 'No people match the current query.'
+      : 'This page has no results. Try a different page or adjust the current filters.'
 
   useEffect(() => {
     editingPersonRef.current = editingPerson
@@ -492,12 +1015,59 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
   }, [])
 
   useEffect(() => {
-    const abortController = new AbortController()
+    if (typeof window === 'undefined') {
+      return
+    }
 
-    fetchPeople(endpoint, abortController.signal)
-      .then((results) => {
-        setPeople(results)
-        setErrorMessage('')
+    const currentSearch = window.location.search.startsWith('?')
+      ? window.location.search.slice(1)
+      : window.location.search
+
+    if (currentSearch === currentQueryString) {
+      return
+    }
+
+    const nextUrl = `${window.location.pathname}${currentQueryString ? `?${currentQueryString}` : ''}${window.location.hash}`
+    window.history.pushState({ directoryQuery: currentQueryString }, '', nextUrl)
+  }, [currentQueryString])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+
+    /**
+     * Syncs the browser back-forward stack into React query state.
+     * @returns {void}
+     */
+    function handlePopState() {
+      const nextQueryState = readQueryFromUrl()
+
+      setQueryState((currentQueryState) =>
+        sameQueryState(currentQueryState, nextQueryState)
+          ? currentQueryState
+          : nextQueryState,
+      )
+    }
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
+
+  useEffect(() => {
+    const abortController = new AbortController()
+    const requestedQueryState = queryState
+
+    setRequestState('loading')
+    setErrorMessage('')
+    setDirectoryPage(createEmptyDirectoryPage(requestedQueryState))
+
+    fetchPeoplePage(peopleRequestUrl, abortController.signal)
+      .then((pageEnvelope) => {
+        setDirectoryPage(pageEnvelope)
         setRequestState('loaded')
       })
       .catch((error) => {
@@ -505,7 +1075,7 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
           return
         }
 
-        setPeople([])
+        setDirectoryPage(createEmptyDirectoryPage(requestedQueryState))
         setErrorMessage(error.message)
         setRequestState('error')
       })
@@ -513,7 +1083,7 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
     return () => {
       abortController.abort()
     }
-  }, [endpoint])
+  }, [peopleRequestUrl, queryState, reloadVersion])
 
   useEffect(() => {
     const connection = createPeoplePresenceConnection(apiBaseUrl)
@@ -650,14 +1220,9 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
       return
     }
 
-    const message =
-      addedEditors.length === 1
-        ? `${formatToastEditorNames(addedEditors, currentEditorName)} also started editing ${editingPerson.name}.`
-        : `${formatToastEditorNames(addedEditors, currentEditorName)} also started editing ${editingPerson.name}.`
-
     const nextToast = {
       id: Date.now(),
-      message,
+      message: `${formatToastEditorNames(addedEditors, currentEditorName)} also started editing ${editingPerson.name}.`,
     }
 
     setEditingToast(nextToast)
@@ -672,6 +1237,28 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
       )
     }, 5000)
   }, [currentEditorName, editingPerson, otherEditorsForActivePerson])
+
+  /**
+   * Applies a partial query-state update and resets paging when required.
+   * @param {Partial<DirectoryQuery>} nextQueryState
+   * @param {boolean} shouldResetPage
+   * @returns {void}
+   */
+  function updateQueryState(nextQueryState, shouldResetPage = false) {
+    setQueryState((currentQueryState) => {
+      const normalizedNextQueryState = normalizeQueryState({
+        ...currentQueryState,
+        ...nextQueryState,
+        page: shouldResetPage
+          ? 1
+          : nextQueryState.page ?? currentQueryState.page,
+      })
+
+      return sameQueryState(currentQueryState, normalizedNextQueryState)
+        ? currentQueryState
+        : normalizedNextQueryState
+    })
+  }
 
   /**
    * Opens the edit dialog for a selected person.
@@ -721,6 +1308,64 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
   }
 
   /**
+   * Updates the text-based search and filter inputs.
+   * @param {import('react').ChangeEvent<HTMLInputElement>} event
+   * @returns {void}
+   */
+  function handleQueryInputChange(event) {
+    const { name, value } = event.target
+    updateQueryState({ [name]: value }, true)
+  }
+
+  /**
+   * Updates the selected sort field.
+   * @param {import('react').ChangeEvent<HTMLSelectElement>} event
+   * @returns {void}
+   */
+  function handleSortByChange(event) {
+    updateQueryState({ sortBy: event.target.value }, true)
+  }
+
+  /**
+   * Updates the selected sort direction.
+   * @param {import('react').ChangeEvent<HTMLSelectElement>} event
+   * @returns {void}
+   */
+  function handleSortDirectionChange(event) {
+    updateQueryState({ sortDirection: event.target.value }, true)
+  }
+
+  /**
+   * Updates the selected page size.
+   * @param {import('react').ChangeEvent<HTMLSelectElement>} event
+   * @returns {void}
+   */
+  function handlePageSizeChange(event) {
+    updateQueryState({ pageSize: event.target.value }, true)
+  }
+
+  /**
+   * Moves the directory to a new page.
+   * @param {number} page
+   * @returns {void}
+   */
+  function handlePageChange(page) {
+    updateQueryState({ page })
+  }
+
+  /**
+   * Resets the directory query back to the default view.
+   * @returns {void}
+   */
+  function handleResetQueryState() {
+    setQueryState((currentQueryState) =>
+      sameQueryState(currentQueryState, defaultQueryState)
+        ? currentQueryState
+        : { ...defaultQueryState },
+    )
+  }
+
+  /**
    * Updates a single field in the edit dialog.
    * @param {import('react').ChangeEvent<HTMLInputElement>} event
    * @returns {void}
@@ -746,7 +1391,7 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
   }
 
   /**
-   * Saves the current dialog values back to the API and local list state.
+   * Saves the current dialog values back to the API and current directory page.
    * @returns {Promise<void>}
    */
   async function handleSavePerson() {
@@ -780,11 +1425,17 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
         nextValues,
       )
 
-      setPeople((currentPeople) =>
-        currentPeople.map((person) =>
-          person.id === savedPerson.id ? savedPerson : person,
-        ),
-      )
+      if (matchesActiveFilters(savedPerson, queryState)) {
+        setDirectoryPage((currentDirectoryPage) => ({
+          ...currentDirectoryPage,
+          items: currentDirectoryPage.items.map((person) =>
+            person.id === savedPerson.id ? savedPerson : person,
+          ),
+        }))
+      } else {
+        setReloadVersion((currentVersion) => currentVersion + 1)
+      }
+
       setEditingPerson(null)
     } catch (error) {
       setSaveErrorMessage(error.message)
@@ -815,7 +1466,11 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
         presenceState={presenceState}
       />
 
-      <section className="people-surface" aria-labelledby="directory-heading">
+      <section
+        aria-busy={requestState === 'loading'}
+        aria-labelledby="directory-heading"
+        className="people-surface"
+      >
         <div className="people-surface__header">
           <div>
             <p className="people-surface__label">Live endpoint</p>
@@ -825,6 +1480,17 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
         </div>
 
         <h2 id="directory-heading">Directory results</h2>
+
+        <FilterControls
+          isResetEnabled={hasCustomQueryState(queryState)}
+          onPageSizeChange={handlePageSizeChange}
+          onQueryInputChange={handleQueryInputChange}
+          onReset={handleResetQueryState}
+          onSortByChange={handleSortByChange}
+          onSortDirectionChange={handleSortDirectionChange}
+          pageSizeChoices={pageSizeChoices}
+          queryState={queryState}
+        />
 
         {requestState === 'loading' ? (
           <p className="people-status" role="status" aria-live="polite">
@@ -838,13 +1504,19 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
           </p>
         ) : null}
 
-        {requestState === 'loaded' && people.length === 0 ? (
-          <p className="people-status" role="status" aria-live="polite">
-            No people were returned by the API.
+        {requestState === 'loaded' ? (
+          <p className="people-results__summary" role="status" aria-live="polite">
+            {formatDirectorySummary(directoryPage)}
           </p>
         ) : null}
 
-        {people.length > 0 ? (
+        {requestState === 'loaded' && people.length === 0 ? (
+          <p className="people-status" role="status" aria-live="polite">
+            {emptyStateMessage}
+          </p>
+        ) : null}
+
+        {requestState === 'loaded' && people.length > 0 ? (
           <ul className="people-grid" aria-label="People returned from ModernApi">
             {people.map((person) => (
               <li className="person-card" key={person.id}>
@@ -873,6 +1545,16 @@ function App({ apiBaseUrl = '', hostDisplayName = '' }) {
               </li>
             ))}
           </ul>
+        ) : null}
+
+        {requestState === 'loaded' ? (
+          <PagerControls
+            hasNextPage={directoryPage.hasNextPage}
+            hasPreviousPage={directoryPage.hasPreviousPage}
+            onPageChange={handlePageChange}
+            page={directoryPage.page}
+            totalPages={directoryPage.totalPages}
+          />
         ) : null}
       </section>
 

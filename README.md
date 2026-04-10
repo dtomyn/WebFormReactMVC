@@ -2,10 +2,48 @@
 
 This solution contains four projects that work together:
 
-- `src/ModernApi`: a .NET 10 Web API that returns an in-memory list of people.
-- `src/LpListSpa`: a React app that renders the people list.
+- `src/ModernApi`: a .NET 10 Web API that serves a paged, filterable people directory backed by deterministic in-memory seed data.
+- `src/LpListSpa`: a React app that renders the shared people directory with server-side paging, filtering, editing, and SignalR presence.
 - `src/LegacyHost.WebForms`: a .NET Framework Web Forms app that loads the built React bundle and shows the API data inside the legacy page.
 - `src/ModernHost.Mvc`: a .NET 10 ASP.NET Core MVC app that loads the same built React bundle and shows the same API data and SignalR presence in a Razor host.
+
+## Quick Start
+
+From the solution root, run either of these:
+
+```powershell
+.\run-all.ps1
+```
+
+or:
+
+```cmd
+run-all.cmd
+```
+
+The launcher does all of the following:
+
+1. builds `WebFormReactMVC.slnx`
+2. starts `ModernApi` on `https://localhost:7114`
+3. starts `ModernHost.Mvc` on `https://localhost:7184`
+4. starts `LegacyHost.WebForms` with IIS Express when available
+5. opens the MVC and legacy host pages in your browser
+
+Optional switches:
+
+- `-SkipBuild`: skip the build and reuse the current outputs
+- `-SkipLegacyHost`: start only `ModernApi` and `ModernHost.Mvc`
+- `-NoBrowser`: do not automatically open browser tabs
+
+Examples:
+
+```powershell
+.\run-all.ps1 -SkipBuild
+.\run-all.ps1 -SkipLegacyHost
+.\run-all.ps1 -SkipBuild -NoBrowser
+```
+
+If IIS Express is not installed, the script still starts the API and MVC host and prints the manual fallback for the legacy host.
 
 ## How The Integration Works
 
@@ -17,8 +55,8 @@ Instead, the flow is:
 2. That bundle is copied into `src/LegacyHost.WebForms/ClientApp` and `src/ModernHost.Mvc/wwwroot/people-app`.
 3. `src/LegacyHost.WebForms/Default.aspx` and `src/ModernHost.Mvc/Views/Home/Index.cshtml` load that bundle.
 4. The bundle calls `ModernApi` at `https://localhost:7114/api/people`.
-5. The API returns the in-memory people list.
-6. The React component renders that list inside the Web Forms page and the MVC page.
+5. The API returns a paged envelope of people plus metadata.
+6. The React component renders the current page of results inside the Web Forms page and the MVC page.
 
 SignalR is also used for live editing presence:
 
@@ -39,8 +77,14 @@ Install all of the following before trying to run the full end-to-end flow:
 Important:
 
 - `ModernApi` and `ModernHost.Mvc` can be run from the CLI with `dotnet run`.
-- `LegacyHost.WebForms` is a classic ASP.NET Web Forms project. The practical way to run it is from Visual Studio with IIS Express or local IIS.
+- `LegacyHost.WebForms` is a classic ASP.NET Web Forms project. The included launcher starts it with IIS Express when IIS Express is installed.
 - Both host apps are configured to call `https://localhost:7114` by default.
+
+Before the first run, trust the local .NET development certificate if needed:
+
+```powershell
+dotnet dev-certs https --trust
+```
 
 ## One-Time Setup
 
@@ -68,9 +112,9 @@ After a successful build, these files should exist:
 
 If those files do not exist, the React component cannot appear inside the corresponding host page.
 
-## Run The Shared App Through Either Host
+## Manual Run Steps
 
-To see the shared React component with live API data, start `ModernApi` first, then run one or both hosts.
+Use these only if you do not want to use `run-all.ps1`.
 
 ### Step 1: Start ModernApi
 
@@ -86,9 +130,9 @@ Wait until you see:
 
 You can verify the API by opening this URL in a browser or calling it from PowerShell:
 
-- `https://localhost:7114/api/people`
+- `https://localhost:7114/api/people?page=1&pageSize=25`
 
-Expected result: JSON containing five people.
+Expected result: JSON containing a paged envelope with `items`, `page`, `pageSize`, `totalCount`, `totalPages`, `hasPreviousPage`, `hasNextPage`, and `appliedFilters`.
 
 ### Step 2A: Run ModernHost.Mvc From The CLI
 
@@ -111,7 +155,7 @@ When the MVC host page opens, it will:
 - load `people-app.js` from `/people-app`
 - mount the shared React component
 - call `ModernApi`
-- render the list returned by `/api/people`
+- render a paged, filterable directory backed by `/api/people`
 
 ### Step 2B: Open The Solution In Visual Studio For LegacyHost.WebForms
 
@@ -136,7 +180,7 @@ When `Default.aspx` opens, the page will:
 - load `people-app.js`
 - mount the shared React component into the legacy page
 - call `ModernApi`
-- render the list returned by `/api/people`
+- render a paged, filterable directory backed by `/api/people`
 
 If everything is working, you will see the people directory rendered inside the Web Forms page.
 
@@ -149,18 +193,17 @@ You can run both hosts at the same time to compare behavior and verify shared Si
 
 ## Fastest Reliable Run Sequence
 
-If you want the shortest dependable all-CLI path, use exactly this:
+The fastest dependable path is now:
 
 ```powershell
-dotnet build WebFormReactMVC.slnx
-dotnet run --project src/ModernApi --launch-profile https
-dotnet run --project src/ModernHost.Mvc/ModernHost.Mvc.csproj --launch-profile https
+.\run-all.ps1
 ```
 
-If you also want the legacy Web Forms host side by side, then in Visual Studio:
+If you want to skip the legacy host and only run the API plus MVC host:
 
-1. Open `WebFormReactMVC.slnx`
-2. Run `LegacyHost.WebForms` with IIS Express
+```powershell
+.\run-all.ps1 -SkipLegacyHost
+```
 
 ## When You Change The React App
 
@@ -208,6 +251,7 @@ Playwright coverage now includes:
 
 - `LegacyHost.WebForms`
 - `ModernHost.Mvc`
+- paged API contract coverage for `ModernApi`
 - a mixed-host scenario that verifies shared SignalR editing presence across both hosts
 
 From the `tests` folder:
@@ -229,7 +273,7 @@ To verify that other users can see who is editing which person across either hos
 3. Open any two pages or tabs from this set:
    - `https://localhost:7184`
    - `http://localhost:63755/Default.aspx`
-4. In one page, click `Edit` on a person
+4. Use the search box or pager if needed to locate a person, then click `Edit`
 5. In the other page, look at the `Who is editing right now` section and the person card badge
 
 Expected behavior:
@@ -298,7 +342,7 @@ Check all of the following:
 Check all of the following:
 
 1. `ModernApi` is still running
-2. `https://localhost:7114/api/people` returns JSON
+2. `https://localhost:7114/api/people?page=1&pageSize=25` returns JSON
 3. The active host configuration still points to `https://localhost:7114`
    - `src/LegacyHost.WebForms/Web.config` for Web Forms
    - `src/ModernHost.Mvc/appsettings.Development.json` for MVC
@@ -314,9 +358,13 @@ dotnet dev-certs https --trust
 
 Then restart the API and reload the page.
 
-### The legacy project will not run from the CLI
+### The launcher could not start the legacy host
 
-That is expected for classic Web Forms projects. Run `LegacyHost.WebForms` from Visual Studio using IIS Express.
+Check all of the following:
+
+1. IIS Express exists at `C:\Program Files\IIS Express\iisexpress.exe` or set `PLAYWRIGHT_IIS_EXPRESS_PATH`
+2. If you already opened the solution in Visual Studio, the `.vs\<solution>\config\applicationhost.config` file still exists
+3. If IIS Express is available but the launcher still cannot start the legacy host, open `WebFormReactMVC.slnx` in Visual Studio and run `LegacyHost.WebForms` with IIS Express once
 
 ## Verified Baseline
 

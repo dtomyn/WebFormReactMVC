@@ -1,4 +1,6 @@
+using ModernApi.People;
 using ModernApi.PeopleEditing;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +19,7 @@ builder.Services.AddCors(options =>
     });
 });
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<PeopleDirectoryService>();
 builder.Services.AddSingleton<PeopleEditingTracker>();
 builder.Services.AddOpenApi();
 
@@ -30,26 +33,13 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseCors("LocalClientApps");
 
-var peopleLock = new object();
-var people = new List<Person>
+app.MapGet("/api/people", ([AsParameters] PeopleQueryRequest request, PeopleDirectoryService peopleDirectory) =>
 {
-    new Person(1, "Mina Patel", "Product Strategy Lead", "Toronto", "mina.patel@example.com"),
-    new Person(2, "Jonah Reed", "Platform Engineer", "Montreal", "jonah.reed@example.com"),
-    new Person(3, "Alina Cho", "Delivery Manager", "Vancouver", "alina.cho@example.com"),
-    new Person(4, "Noah Bennett", "Business Analyst", "Calgary", "noah.bennett@example.com"),
-    new Person(5, "Sofia Nguyen", "UX Researcher", "Ottawa", "sofia.nguyen@example.com")
-};
-
-app.MapGet("/api/people", () =>
-{
-    lock (peopleLock)
-    {
-        return TypedResults.Ok(people.ToArray());
-    }
+    return TypedResults.Ok(peopleDirectory.GetPeoplePage(request));
 })
     .WithName("GetPeople");
 
-app.MapPut("/api/people/{id:int}", (int id, UpdatePersonRequest request) =>
+app.MapPut("/api/people/{id:int}", (int id, UpdatePersonRequest request, PeopleDirectoryService peopleDirectory) =>
 {
     if (string.IsNullOrWhiteSpace(request.Name)
         || string.IsNullOrWhiteSpace(request.Role)
@@ -70,31 +60,11 @@ app.MapPut("/api/people/{id:int}", (int id, UpdatePersonRequest request) =>
         });
     }
 
-    lock (peopleLock)
-    {
-        var currentIndex = people.FindIndex(person => person.Id == id);
-
-        if (currentIndex < 0)
-        {
-            return Results.NotFound();
-        }
-
-        var updatedPerson = new Person(
-            id,
-            request.Name.Trim(),
-            request.Role.Trim(),
-            request.Location.Trim(),
-            request.Email.Trim());
-
-        people[currentIndex] = updatedPerson;
-        return Results.Ok(updatedPerson);
-    }
+    var updatedPerson = peopleDirectory.UpdatePerson(id, request);
+    return updatedPerson is null ? Results.NotFound() : Results.Ok(updatedPerson);
 })
     .WithName("UpdatePerson");
 
 app.MapHub<PeopleEditingHub>("/hubs/peopleEditing");
 
 app.Run();
-
-internal sealed record Person(int Id, string Name, string Role, string Location, string Email);
-internal sealed record UpdatePersonRequest(string Name, string Role, string Location, string Email);
